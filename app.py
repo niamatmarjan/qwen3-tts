@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 import logging
-import os
 from pathlib import Path
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
@@ -22,7 +21,7 @@ import gradio as gr
 import numpy as np
 import soundfile as sf
 
-from device_utils import ModelManager, get_optimal_device_config, is_model_fully_cached
+from device_utils import ModelManager, is_model_fully_cached
 
 logging.basicConfig(
     level=logging.INFO,
@@ -280,170 +279,397 @@ MODE_CLASSES = {
     "Custom Voice": "mode-custom",
 }
 
-THEME = gr.themes.Soft(
+MODE_WAVEFORM_COLORS = {
+    "Voice Design": "#8b5cf6",
+    "Voice Clone": "#0e7490",
+    "Custom Voice": "#059669",
+}
+
+THEME = gr.themes.Base(
     primary_hue="violet",
     neutral_hue="slate",
     font=["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
 ).set(
     body_background_fill="#f5f6fa",
     body_background_fill_dark="#0c1019",
-    block_background_fill="#ffffff",
-    block_background_fill_dark="#171e2b",
+    body_text_color="#172033",
+    body_text_color_dark="#eef2ff",
+    body_text_color_subdued="#526078",
+    body_text_color_subdued_dark="#b4bfd2",
+    body_text_size="15px",
+    background_fill_primary="#ffffff",
+    background_fill_primary_dark="#171e2b",
+    background_fill_secondary="#f0f3f9",
+    background_fill_secondary_dark="#101725",
+    block_background_fill="transparent",
+    block_background_fill_dark="transparent",
     block_border_color="#d5dce7",
     block_border_color_dark="#3b465c",
+    block_border_width="0px",
+    block_padding="0px",
+    block_shadow="none",
+    block_radius="12px",
+    layout_gap="16px",
+    form_gap_width="18px",
+    input_radius="12px",
+    input_padding="12px 14px",
+    input_text_size="15px",
     input_background_fill="#ffffff",
     input_background_fill_dark="#101725",
     input_border_width="1px",
     input_border_color="#d5dce7",
     input_border_color_dark="#3b465c",
+    input_border_color_focus="#6d28d9",
+    input_border_color_focus_dark="#c4b5fd",
+    input_placeholder_color="#64748b",
+    input_placeholder_color_dark="#94a3b8",
+    input_shadow="none",
+    input_shadow_focus="none",
     block_label_background_fill="transparent",
     block_label_background_fill_dark="transparent",
-    block_label_text_color="#526078",
-    block_label_text_color_dark="#b4bfd2",
+    block_label_text_color="#172033",
+    block_label_text_color_dark="#e2e8f0",
     block_label_border_width="0px",
+    block_label_padding="0px",
+    block_label_text_size="13px",
+    block_label_text_weight="600",
     block_label_shadow="none",
+    block_info_text_size="13px",
+    prose_text_size="15px",
+    button_small_text_size="13px",
+    button_small_text_weight="500",
+    button_large_text_size="15px",
+    button_large_radius="12px",
+    button_secondary_background_fill="#f0f3f9",
+    button_secondary_background_fill_dark="#202a3a",
+    button_secondary_background_fill_hover="#e7ecf5",
+    button_secondary_background_fill_hover_dark="#2a3649",
+    button_secondary_text_color="#172033",
+    button_secondary_text_color_dark="#eef2ff",
+    button_secondary_border_color="#d5dce7",
+    button_secondary_border_color_dark="#3b465c",
+    button_transition="background-color 120ms ease, border-color 120ms ease, color 120ms ease",
 )
 
 CUSTOM_CSS = """
 .gradio-container {
     --studio-glass: rgba(255, 255, 255, .86);
+    --studio-surface: #fff;
+    --studio-inset: #f0f3f9;
     --studio-ink: #172033;
     --studio-muted: #526078;
     --studio-line: #d5dce7;
     --studio-violet: #6d28d9;
     --studio-cyan: #0e7490;
     --studio-emerald: #047857;
-    --studio-shadow: 0 .75rem 2.5rem rgba(23, 32, 51, .07);
-    max-width: 1200px !important;
-    margin: 0 auto;
-    padding: clamp(1rem, 3vw, 2.5rem) !important;
+    --studio-shadow: 0 .5rem 2rem rgba(23, 32, 51, .04);
+    width: 100% !important;
+    max-width: 1280px !important;
+    margin: 0 auto !important;
+    padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2.5rem) !important;
+    overflow: visible !important;
     color: var(--studio-ink);
     font-optical-sizing: auto;
-    background: radial-gradient(ellipse at top left, rgba(139, 92, 246, .08), transparent 55%),
-                radial-gradient(ellipse at top right, rgba(6, 182, 212, .06), transparent 45%);
+    background: transparent;
+}
+.gradio-container .main {
+    max-width: none !important;
+    padding: 0 !important;
 }
 .dark .gradio-container {
     --studio-glass: rgba(23, 30, 43, .9);
+    --studio-surface: #171e2b;
+    --studio-inset: #101725;
     --studio-ink: #eef2ff;
     --studio-muted: #b4bfd2;
     --studio-line: #3b465c;
     --studio-violet: #c4b5fd;
     --studio-cyan: #67e8f9;
     --studio-emerald: #6ee7b7;
-    --studio-shadow: 0 .75rem 2.5rem rgba(0, 0, 0, .2);
+    --studio-shadow: 0 .5rem 2rem rgba(0, 0, 0, .12);
 }
-.studio-header {padding: .5rem 0 1.5rem;}
+.studio-html, .studio-html .html-container {
+    padding: 0 !important;
+    min-height: 0;
+    border: 0 !important;
+    background: transparent !important;
+}
+.studio-header {padding: .25rem 0 .5rem;}
 .studio-eyebrow {
-    color: var(--studio-muted); font-size: .75rem;
-    font-weight: 650; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--studio-muted); font-size: .6875rem;
+    font-weight: 650; letter-spacing: .1em; text-transform: uppercase;
 }
 .studio-header h1 {
-    color: var(--studio-ink); font-size: clamp(2rem, 5vw, 3.25rem);
-    font-weight: 700; line-height: 1.1; letter-spacing: -.035em; margin: .5rem 0;
+    color: var(--studio-ink); font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 700; line-height: 1.12; letter-spacing: -.035em; margin: .625rem 0;
 }
-.studio-header p, .studio-hint, .reference-info {color: var(--studio-muted); line-height: 1.6;}
+.studio-header p {color: var(--studio-muted); font-size: .9375rem; line-height: 1.6; margin: 0;}
 .hardware-strip {
-    display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; padding: 1rem 1.25rem;
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: .5rem 1.25rem; padding: .875rem 1rem;
     background: var(--studio-glass); border: 1px solid var(--studio-line);
-    border-radius: 1rem; color: var(--studio-muted); font-size: .85rem;
+    border-radius: .875rem; color: var(--studio-muted); font-size: .8125rem; line-height: 1.5;
     backdrop-filter: blur(20px) saturate(140%);
     -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
+.hardware-strip > span {white-space: nowrap;}
 .hardware-strip strong {color: var(--studio-ink);}
-#studio-tabs {margin-top: 1rem; border: 0; background: transparent;}
-#studio-tabs [role="tablist"] {gap: .5rem; border: 0; padding: .5rem 0 1rem;}
-#studio-tabs [role="tab"] {
-    border-radius: .8rem; min-height: 2.75rem; padding: .65rem 1.2rem; font-weight: 600;
-    color: var(--tab-accent); border: 1px solid transparent;
+.hardware-strip .runtime-note {margin-left: auto; white-space: normal;}
+.studio-help {
+    border: 1px solid var(--studio-line) !important;
+    border-radius: .875rem !important; background: transparent !important;
 }
-#studio-tabs [role="tab"]:nth-child(1) {--tab-accent: var(--studio-violet);}
-#studio-tabs [role="tab"]:nth-child(2) {--tab-accent: var(--studio-cyan);}
-#studio-tabs [role="tab"]:nth-child(3) {--tab-accent: var(--studio-emerald);}
+.studio-help > button {min-height: 2.75rem; padding: .75rem 1rem; font-size: .8125rem;}
+.studio-help .prose {color: var(--studio-muted); font-size: .8125rem; line-height: 1.65;}
+.studio-help .prose p {margin: 0;}
+#studio-tabs {margin-top: .25rem; border: 0; background: transparent;}
+#studio-tabs .tab-wrapper {
+    min-height: 3.5rem; height: auto; padding: .3125rem;
+    margin-bottom: 1.25rem; border: 1px solid var(--studio-line);
+    border-radius: 1rem; background: var(--studio-inset);
+}
+#studio-tabs [role="tablist"] {
+    flex: 1; align-items: stretch; gap: .25rem;
+    height: auto !important; min-height: 2.75rem; padding: 0;
+    border: 0; overflow: visible;
+}
+/* Gradio measures hidden copies of the tabs; keep their sizing in sync. */
+#studio-tabs .tab-container > button {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    min-height: 2.75rem; padding: .625rem 1rem;
+    border: 1px solid transparent; border-radius: .6875rem;
+    font-size: .9375rem; font-weight: 600; line-height: 1.25;
+    white-space: nowrap;
+}
+#studio-tabs .tab-container.visually-hidden {visibility: hidden;}
+#studio-tabs [role="tablist"]::after, #studio-tabs [role="tab"]::after {display: none;}
+#studio-tabs [role="tab"] {flex: 1 1 0; color: var(--tab-accent);}
+#studio-tabs [role="tab"]:hover {background: var(--studio-glass);}
+#studio-tabs .tab-container > button:nth-child(1) {--tab-accent: var(--studio-violet);}
+#studio-tabs .tab-container > button:nth-child(2) {--tab-accent: var(--studio-cyan);}
+#studio-tabs .tab-container > button:nth-child(3) {--tab-accent: var(--studio-emerald);}
 #studio-tabs [role="tab"][aria-selected="true"] {
-    border-color: var(--tab-accent);
-    background: color-mix(in srgb, var(--tab-accent) 10%, transparent);
+    border-color: var(--studio-line); background: var(--studio-surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
 }
-.mode-design {--mode-accent: var(--studio-violet); --mode-solid: #6d28d9;}
-.mode-clone {--mode-accent: var(--studio-cyan); --mode-solid: #0e7490;}
-.mode-custom {--mode-accent: var(--studio-emerald); --mode-solid: #047857;}
+#studio-tabs [role="tabpanel"] {padding: 0; border: 0; background: transparent;}
+.mode-design {
+    --mode-accent: var(--studio-violet); --mode-solid: #6d28d9; --mode-hover: #5b21b6;
+}
+.mode-clone {
+    --mode-accent: var(--studio-cyan); --mode-solid: #0e7490; --mode-hover: #155e75;
+}
+.mode-custom {
+    --mode-accent: var(--studio-emerald); --mode-solid: #047857; --mode-hover: #065f46;
+}
+.mode-design, .mode-clone, .mode-custom {
+    --input-border-color-focus: var(--mode-accent);
+    --checkbox-background-color-selected: var(--mode-solid);
+    --checkbox-border-color-selected: var(--mode-solid);
+}
+.studio-workspace {
+    display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: start; gap: 1.25rem;
+}
+.studio-workspace > .column {min-width: 0 !important;}
 .studio-panel {
-    padding: clamp(1rem, 2.5vw, 1.75rem) !important;
-    border: 1px solid var(--studio-line) !important; border-radius: 1.25rem !important;
-    background: var(--studio-glass) !important; box-shadow: var(--studio-shadow);
+    min-width: 0 !important; gap: 1.125rem;
+    padding: clamp(1rem, 2vw, 1.5rem) !important;
+    border: 1px solid var(--studio-line); border-radius: 1.25rem;
+    background: var(--studio-glass); box-shadow: var(--studio-shadow);
     backdrop-filter: blur(24px) saturate(140%);
     -webkit-backdrop-filter: blur(24px) saturate(140%);
 }
-.studio-panel h2 {font-size: 1.25rem; line-height: 1.3; letter-spacing: -.02em;}
-.studio-panel textarea, .studio-panel input {
-    border-radius: .75rem !important; line-height: 1.55;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
+.studio-panel .form {
+    gap: 1.125rem; border: 0; background: transparent; box-shadow: none; overflow: visible;
 }
-.studio-panel textarea:focus, .studio-panel input:focus {
-    border-color: var(--mode-accent, var(--studio-violet)) !important;
+.studio-section-heading .prose h2 {
+    color: var(--studio-ink); margin: 0 0 .375rem;
+    font-size: 1.1875rem; font-weight: 650; line-height: 1.3; letter-spacing: -.02em;
 }
+.studio-section-heading .prose p {
+    color: var(--studio-muted); margin: 0; font-size: .875rem; line-height: 1.6;
+}
+.studio-field {
+    min-width: 0 !important; padding: 0 !important; overflow: visible !important;
+    border: 0 !important; box-shadow: none !important; background: transparent !important;
+}
+.studio-field textarea {line-height: 1.6; resize: vertical;}
+.studio-field textarea::placeholder, .studio-field input::placeholder {opacity: 1;}
+.studio-field [data-testid="block-info"] {font-size: .8125rem; font-weight: 600;}
+.studio-settings {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .875rem;
+}
+/* Gradio groups consecutive inputs in a form wrapper; each field belongs in the grid. */
+.studio-settings > .form {display: contents;}
+.studio-settings-three {grid-template-columns: repeat(3, minmax(0, 1fr));}
+.studio-hint .prose, .reference-info {
+    color: var(--studio-muted); font-size: .8125rem; line-height: 1.6;
+}
+.studio-hint .prose p {margin: 0;}
+.studio-model-note .prose {font-size: .75rem;}
 .gradio-container button, .gradio-container a {touch-action: manipulation;}
-.gradio-container button:focus-visible, .gradio-container a:focus-visible,
-.gradio-container input:focus-visible, .gradio-container textarea:focus-visible {
-    outline: 3px solid var(--mode-accent, var(--studio-violet)) !important;
+.gradio-container :is(button, a, input, textarea):focus-visible {
+    outline: 2px solid var(--mode-accent, var(--studio-violet)) !important;
     outline-offset: 3px;
+}
+.studio-field textarea:focus-visible {
+    border-color: var(--mode-accent) !important; outline-offset: 1px;
 }
 .studio-generate {
     background: var(--mode-solid) !important; border-color: var(--mode-solid) !important;
-    color: #fff !important; min-height: 3rem; border-radius: .85rem !important;
-    font-weight: 650 !important; transition: filter 120ms ease, transform 100ms ease;
+    color: #fff !important; min-height: 3rem; border-radius: .75rem !important;
+    font-size: .9375rem !important; font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .08);
+    transition: background-color 120ms ease, transform 100ms ease;
 }
-.studio-generate:hover {filter: brightness(1.12);}
+.studio-generate:hover {background: var(--mode-hover) !important;}
 .studio-generate:active {transform: scale(.985);}
-.preset-row {gap: .5rem !important;}
+.preset-row {gap: .5rem; align-items: center;}
 .preset-pill {
-    flex-grow: 0 !important; border-radius: 999px !important;
-    color: var(--mode-accent) !important; min-height: 2.75rem !important;
-    border: 1px solid var(--studio-line) !important;
-    transition: border-color 120ms ease, transform 100ms ease;
+    flex: 0 0 auto !important; width: auto !important; max-width: 100%;
+    min-height: 2.75rem !important; padding: .625rem .75rem !important;
+    border-radius: 999px !important; white-space: nowrap;
+    font-size: .8125rem !important; font-weight: 500 !important; line-height: 1.25 !important;
+    color: var(--mode-accent) !important; background: var(--studio-inset) !important;
+    border: 1px solid var(--studio-line) !important; box-shadow: none !important;
+    transition: background-color 120ms ease, border-color 120ms ease, transform 100ms ease;
 }
-.preset-pill:hover {border-color: var(--mode-accent) !important;}
+.preset-pill:hover {
+    background: color-mix(in srgb, var(--mode-accent) 8%, var(--studio-surface)) !important;
+    border-color: var(--mode-accent) !important;
+}
 .preset-pill:active {transform: scale(.97);}
-.studio-status {font-size: .9rem; line-height: 1.6; color: var(--studio-muted);}
+.studio-output > .studio-empty {
+    padding: 1.75rem 1rem !important; text-align: center;
+    border: 1px dashed var(--studio-line) !important;
+    border-radius: .875rem; background: var(--studio-inset) !important;
+}
+.studio-empty svg {display: block; margin: 0 auto .75rem; color: var(--mode-accent);}
+.studio-empty h3 {margin: 0 0 .375rem; color: var(--studio-ink); font-size: .9375rem; font-weight: 600;}
+.studio-empty p {margin: 0; color: var(--studio-muted); font-size: .8125rem; line-height: 1.6;}
+.studio-output:has(audio) .studio-empty, .studio-player:not(:has(audio)) {display: none;}
+.studio-player, .studio-reference {
+    /* Native playback controls otherwise keep light gray text in both themes. */
+    --neutral-400: var(--studio-muted);
+    min-width: 0 !important; padding: .875rem !important;
+    border: 1px solid var(--studio-line) !important;
+    border-radius: .875rem !important; background: var(--studio-inset) !important;
+}
+.studio-reference {--color-accent: var(--mode-solid);}
+.studio-reference #waveform > div::part(region-handle) {width: 12px !important;}
+.studio-reference #waveform > div::part(region-handle-left),
+.studio-reference #waveform > div::part(region-handle-right) {border-color: var(--mode-accent) !important;}
+.studio-status-wrap {min-height: 2.75rem;}
+.studio-status {
+    display: flex; align-items: baseline; gap: .5rem;
+    color: var(--studio-muted); font-size: .8125rem; line-height: 1.6; overflow-wrap: anywhere;
+}
+.studio-status::before {
+    content: ""; flex: 0 0 .375rem; width: .375rem; height: .375rem;
+    border-radius: 50%; background: var(--mode-accent, var(--studio-muted));
+}
 .studio-status[data-error="true"] {color: #b91c1c;}
 .dark .studio-status[data-error="true"] {color: #fca5a5;}
-.reference-info {font-size: .85rem; padding: .25rem 0;}
-#recent-generations {margin-top: 1.5rem;}
+.studio-status[data-error="true"]::before {background: currentColor;}
+#recent-generations {margin-top: .5rem;}
 .history-card {
-    margin-top: .75rem; box-shadow: none;
-    background: var(--block-background-fill) !important;
+    gap: .875rem; padding: 1rem !important;
+    border-radius: 1rem; box-shadow: none;
+    background: var(--studio-surface);
     backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-.history-meta {display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;}
+.history-meta {display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: center;}
 .mode-badge {
     display: inline-flex; border: 1px solid currentColor; border-radius: 999px;
-    color: var(--mode-accent); padding: .2rem .65rem; font-size: .8rem; font-weight: 650;
+    color: var(--mode-accent); padding: .1875rem .625rem; font-size: .75rem; font-weight: 600;
+    line-height: 1.5; white-space: nowrap;
 }
-.history-meta time {color: var(--studio-muted); font-size: .85rem;}
-.history-empty {padding: 1.5rem 0; color: var(--studio-muted);}
+.history-meta time {color: var(--studio-muted); font-size: .75rem; line-height: 1.5;}
+.history-playback {
+    display: grid; grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center; gap: 1rem;
+}
+.studio-download {
+    flex: 0 0 auto !important;
+    min-height: 2.75rem !important; padding: .625rem 1rem !important;
+    border-radius: .75rem !important; font-size: .8125rem !important;
+    font-weight: 600 !important; white-space: nowrap;
+}
+.history-empty {
+    margin: 0; padding: 1.25rem; border: 1px dashed var(--studio-line);
+    border-radius: .875rem; background: var(--studio-inset);
+    color: var(--studio-muted); font-size: .875rem; line-height: 1.6; text-align: center;
+}
+/* Gradio scopes media queries inside its content container, not the page root. */
+@media (max-width: 900px) {
+    .studio-workspace {grid-template-columns: minmax(0, 1fr);}
+}
 @media (max-width: 640px) {
-    #studio-tabs [role="tablist"] {gap: .25rem;}
-    #studio-tabs [role="tab"] {padding: .6rem .75rem;}
-    .studio-panel {min-width: 0 !important;}
+    .hardware-strip {gap: .375rem 1rem;}
+    .hardware-strip .runtime-note {flex-basis: 100%; margin-left: 0;}
+    #studio-tabs .tab-container > button {padding: .625rem .5rem; font-size: .8125rem;}
+    .studio-settings-three {grid-template-columns: repeat(2, minmax(0, 1fr));}
+    .studio-settings-three .studio-field:last-child {grid-column: 1 / -1;}
+    .history-playback {grid-template-columns: minmax(0, 1fr);}
+    .history-playback .studio-download {width: 100% !important;}
+}
+@media (max-width: 380px) {
+    #studio-tabs .tab-container > button {font-size: .75rem; padding: .625rem .375rem;}
 }
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    #studio-tabs *, #studio-tabs *::before, #studio-tabs *::after,
+    #recent-generations *, #recent-generations *::before, #recent-generations *::after {
         animation: none !important; transition: none !important; scroll-behavior: auto !important;
     }
     .studio-generate:active, .preset-pill:active {transform: none;}
 }
 @media (prefers-reduced-transparency: reduce) {
     .studio-panel, .hardware-strip {
-        background: var(--block-background-fill) !important;
+        background: var(--studio-surface) !important;
         backdrop-filter: none; -webkit-backdrop-filter: none;
     }
 }
 @media (prefers-contrast: more) {
     .studio-panel, .hardware-strip {
-        background: var(--block-background-fill) !important;
+        background: var(--studio-surface) !important;
         border: 2px solid var(--studio-ink) !important;
         backdrop-filter: none; -webkit-backdrop-filter: none;
     }
-    .studio-hint, .studio-status, .reference-info, .history-meta time {color: var(--studio-ink);}
+    .studio-hint .prose, .studio-status, .reference-info, .history-meta time {color: var(--studio-ink);}
+}
+"""
+
+TAB_KEYBOARD_JS = """
+() => {
+    const navigation = document.querySelector("#studio-tabs");
+    if (!navigation) throw new Error("Studio mode navigation is unavailable.");
+    if (navigation.dataset.keyboardReady) return [];
+    navigation.dataset.keyboardReady = "true";
+    const tabs = () => [...navigation.querySelectorAll('[role="tab"]')]
+        .filter(tab => tab.getAttribute("aria-disabled") !== "true");
+    const setTabStop = active => tabs().forEach(tab => { tab.tabIndex = tab === active ? 0 : -1; });
+    setTabStop(navigation.querySelector('[role="tab"][aria-selected="true"]'));
+    navigation.addEventListener("click", event => {
+        const tab = event.target.closest('[role="tab"]');
+        if (tab) setTabStop(tab);
+    });
+    navigation.addEventListener("keydown", event => {
+        const current = event.target.closest('[role="tab"]');
+        if (!current) return;
+        const items = tabs();
+        const index = items.indexOf(current);
+        let next;
+        if (event.key === "ArrowRight") next = (index + 1) % items.length;
+        else if (event.key === "ArrowLeft") next = (index - 1 + items.length) % items.length;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = items.length - 1;
+        else return;
+        event.preventDefault();
+        items[next].focus();
+        items[next].click();
+    });
+    return [];
 }
 """
 
@@ -557,21 +783,45 @@ def custom_with_history(
 def preset_buttons(presets: Dict[str, str], target: gr.Textbox) -> None:
     with gr.Row(elem_classes="preset-row"):
         for label, prompt in presets.items():
-            button = gr.Button(label, size="sm", min_width=100, elem_classes="preset-pill")
+            button = gr.Button(
+                label, size="sm", scale=0, min_width=0, elem_classes="preset-pill",
+            )
             button.click(
                 fn=lambda value=prompt: value,
                 inputs=None, outputs=target, queue=False, api_visibility="private",
+                show_progress="hidden",
             )
 
 
-def output_panel(color: str) -> Tuple[gr.Audio, gr.HTML]:
-    with gr.Column(scale=2, min_width=260, elem_classes="studio-panel"):
-        gr.Markdown("## Listen back\nYour generated speech will appear here.")
+def output_panel(mode: str, color: str) -> Tuple[gr.Audio, gr.HTML]:
+    with gr.Column(
+        scale=2, min_width=0, elem_id=f"{mode}-preview",
+        elem_classes=["studio-panel", "studio-output"],
+    ):
+        gr.Markdown(
+            "## Listen back\nPreview your take before downloading.",
+            elem_classes="studio-section-heading",
+        )
+        gr.HTML(
+            '<svg width="48" height="32" viewBox="0 0 48 32" fill="none" aria-hidden="true">'
+            '<path d="M4 13v6m8-11v16m8-21v26m8-22v18m8-15v12m8-8v4" '
+            'stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
+            '<h3>Ready for your first take</h3>'
+            '<p>Generate speech to see the waveform<br>and hear your voice in action.</p>',
+            elem_classes=["studio-html", "studio-empty"],
+        )
         audio = gr.Audio(
             label="Generated speech", type="numpy", format="wav", interactive=False,
-            waveform_options=gr.WaveformOptions(waveform_progress_color=color),
+            editable=False, buttons=[], min_width=0,
+            elem_id=f"{mode}-audio", elem_classes="studio-player",
+            waveform_options=gr.WaveformOptions(
+                waveform_color="#64748b", waveform_progress_color=color,
+            ),
         )
-        status = gr.HTML(status_markup("Ready when you are."))
+        status = gr.HTML(
+            status_markup("Ready when you are."),
+            elem_id=f"{mode}-status", elem_classes=["studio-html", "studio-status-wrap"],
+        )
     return audio, status
 
 
@@ -584,20 +834,25 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
         gr.HTML(
             '<header class="studio-header"><div class="studio-eyebrow">Qwen3-TTS / Audio Studio</div>'
             '<h1>Give your words a voice.</h1>'
-            '<p>Design a new voice, work from a reference, or direct a studio speaker.</p></header>'
+            '<p>Design a new voice, work from a reference, or direct a studio speaker.</p></header>',
+            elem_id="studio-header", elem_classes="studio-html",
         )
+
         def hardware_markup() -> str:
             active = manager.config
+            precision = str(active.dtype).replace("torch.", "")
             return (
                 '<div class="hardware-strip" role="status" aria-live="polite">'
                 f'<span>Device <strong>{escape(active.device.upper())}</strong></span>'
-                f'<span>Precision <strong>{escape(str(active.dtype))}</strong></span>'
+                f'<span>Precision <strong>{escape(precision)}</strong></span>'
                 f'<span>Attention <strong>{escape(str(active.attn_implementation))}</strong></span>'
-                '<span>Models load on demand / one model in memory</span></div>'
+                '<span class="runtime-note">Models load on demand / one model in memory</span></div>'
             )
 
-        device_info = gr.HTML(hardware_markup())
-        with gr.Accordion("Model downloads & memory", open=False):
+        device_info = gr.HTML(
+            hardware_markup(), elem_id="studio-runtime", elem_classes="studio-html",
+        )
+        with gr.Accordion("Model downloads & memory", open=False, elem_classes="studio-help"):
             gr.Markdown(
                 "The first generation for each model downloads its weights "
                 "(approximately 1.5-3.5 GB). Later requests reuse the local disk cache. "
@@ -606,129 +861,178 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
             )
 
         with gr.Tabs(elem_id="studio-tabs"):
-            with gr.Tab("Voice Design", elem_classes="mode-design"):
-                with gr.Row():
-                    with gr.Column(scale=3, min_width=280, elem_classes="studio-panel"):
-                        gr.Markdown("## Imagine a voice\nDescribe the character. Set the tone. Make it yours.")
+            with gr.Tab(
+                "Voice Design", id="design", elem_id="voice-design", elem_classes="mode-design",
+            ):
+                with gr.Row(elem_classes="studio-workspace"):
+                    with gr.Column(
+                        scale=3, min_width=0, elem_id="design-controls", elem_classes="studio-panel",
+                    ):
+                        gr.Markdown(
+                            "## Imagine a voice\nDescribe the character, tone, and delivery.",
+                            elem_classes="studio-section-heading",
+                        )
                         design_text = gr.Textbox(
-                            label="Text to Synthesize",
+                            label="Script",
                             placeholder="Enter the text you want the model to speak...",
                             lines=4,
                             value="Welcome to Qwen3-TTS! This voice is generated entirely from a text description.",
+                            elem_id="design-text", elem_classes="studio-field",
                         )
                         design_language = gr.Dropdown(
                             label="Language",
                             choices=LANGUAGES,
                             value="Auto",
+                            elem_classes="studio-field",
                         )
                         design_instruct = gr.Textbox(
-                            label="Voice Description / Style Instruction",
+                            label="Voice description",
                             placeholder="e.g. A young cheerful female voice speaking with enthusiasm and warmth.",
                             lines=3,
                             value="A warm and clear female voice speaking with a friendly tone.",
+                            elem_id="design-instruction", elem_classes="studio-field",
                         )
                         gr.Markdown("Start with an inspiration", elem_classes="studio-hint")
                         preset_buttons(DESIGN_PRESETS, design_instruct)
-                        gr.Markdown("Voice Design / 1.7B", elem_classes="studio-hint")
-                        design_btn = gr.Button(
-                            "Generate voice", variant="primary", elem_classes="studio-generate",
+                        gr.Markdown(
+                            "Uses the 1.7B Voice Design model.",
+                            elem_classes=["studio-hint", "studio-model-note"],
                         )
-                    design_audio, design_status = output_panel("#8b5cf6")
+                        design_btn = gr.Button(
+                            "Generate voice", variant="primary",
+                            elem_id="design-generate", elem_classes="studio-generate",
+                        )
+                    design_audio, design_status = output_panel(
+                        "design", MODE_WAVEFORM_COLORS["Voice Design"],
+                    )
 
-            with gr.Tab("Voice Clone", elem_classes="mode-clone"):
-                with gr.Row():
-                    with gr.Column(scale=3, min_width=280, elem_classes="studio-panel"):
-                        gr.Markdown("## Start with a voice\nUse a clean reference of at least 3 seconds.")
+            with gr.Tab(
+                "Voice Clone", id="clone", elem_id="voice-clone", elem_classes="mode-clone",
+            ):
+                with gr.Row(elem_classes="studio-workspace"):
+                    with gr.Column(
+                        scale=3, min_width=0, elem_id="clone-controls", elem_classes="studio-panel",
+                    ):
+                        gr.Markdown(
+                            "## Start with a voice\nUse a clean reference of at least 3 seconds.",
+                            elem_classes="studio-section-heading",
+                        )
                         gr.Markdown(
                             "Only clone a voice you own or have permission to use.",
                             elem_classes="studio-hint",
                         )
                         clone_target_text = gr.Textbox(
-                            label="Target Text to Synthesize",
+                            label="Script",
                             placeholder="Enter the text for the cloned voice to speak...",
                             lines=3,
                             value="Hello, this audio was synthesized using voice cloning from a reference sample.",
+                            elem_id="clone-text", elem_classes="studio-field",
                         )
                         clone_ref_audio = gr.Audio(
-                            label="Reference Audio (Upload or Record)",
+                            label="Reference audio",
                             sources=["upload", "microphone"],
                             type="numpy",
                             interactive=True,
                             editable=True,
+                            buttons=[],
+                            min_width=0, elem_id="clone-reference", elem_classes="studio-reference",
                             waveform_options=gr.WaveformOptions(
-                                waveform_color="#94a3b8",
-                                waveform_progress_color="#0e7490",
+                                waveform_color="#64748b",
+                                waveform_progress_color=MODE_WAVEFORM_COLORS["Voice Clone"],
                                 trim_region_color="rgba(6, 182, 212, 0.2)",
                                 show_recording_waveform=True,
                                 skip_length=5,
                             ),
                         )
-                        clone_ref_info = gr.HTML(reference_audio_info(None))
+                        clone_ref_info = gr.HTML(
+                            reference_audio_info(None),
+                            elem_id="clone-reference-info", elem_classes="studio-html",
+                        )
                         gr.Markdown(
-                            "Play or seek in the waveform to review. Use the player's trim tool "
-                            "to select and apply a region before cloning. After trimming, update "
-                            "the transcript to match the remaining audio.",
+                            "Play or seek to review. Choose the scissors tool, drag the selection "
+                            "handles, then select Trim. Update the transcript to match the trimmed audio.",
                             elem_classes="studio-hint",
                         )
                         clone_ref_audio.change(
                             reference_audio_info, inputs=clone_ref_audio, outputs=clone_ref_info,
-                            queue=False, api_visibility="private",
+                            queue=False, api_visibility="private", show_progress="hidden",
                         )
                         clone_ref_text = gr.Textbox(
-                            label="Reference Audio Transcript (Optional if x-vector only is checked)",
+                            label="Reference transcript",
+                            info="Optional when x-vector only is enabled.",
                             placeholder="Exact transcript of the reference audio clip (improves clone fidelity)...",
                             lines=2,
+                            elem_id="clone-transcript", elem_classes="studio-field",
                         )
-                        with gr.Row():
+                        with gr.Row(elem_classes="studio-settings"):
                             clone_language = gr.Dropdown(
                                 label="Language",
                                 choices=LANGUAGES,
                                 value="Auto",
+                                min_width=0, elem_classes="studio-field",
                             )
                             clone_model_size = gr.Dropdown(
                                 label="Model Size",
                                 choices=MODEL_SIZES,
                                 value="1.7B",
+                                min_width=0, elem_classes="studio-field",
                             )
                         clone_xvector = gr.Checkbox(
-                            label="Use x-vector only (Fast clone, doesn't require reference text)",
+                            label="Use x-vector only",
+                            info="A faster, text-free clone without a reference transcript.",
                             value=False,
+                            elem_id="clone-xvector", elem_classes="studio-field",
                         )
                         clone_btn = gr.Button(
-                            "Clone voice", variant="primary", elem_classes="studio-generate",
+                            "Clone voice", variant="primary",
+                            elem_id="clone-generate", elem_classes="studio-generate",
                         )
-                    clone_audio, clone_status = output_panel("#0e7490")
+                    clone_audio, clone_status = output_panel(
+                        "clone", MODE_WAVEFORM_COLORS["Voice Clone"],
+                    )
 
-            with gr.Tab("Custom Voice", elem_classes="mode-custom"):
-                with gr.Row():
-                    with gr.Column(scale=3, min_width=280, elem_classes="studio-panel"):
-                        gr.Markdown("## Direct the delivery\nNine speakers. Your words. A little personality.")
+            with gr.Tab(
+                "Custom Voice", id="custom", elem_id="custom-voice", elem_classes="mode-custom",
+            ):
+                with gr.Row(elem_classes="studio-workspace"):
+                    with gr.Column(
+                        scale=3, min_width=0, elem_id="custom-controls", elem_classes="studio-panel",
+                    ):
+                        gr.Markdown(
+                            "## Direct the delivery\nNine speakers. Your words. Your direction.",
+                            elem_classes="studio-section-heading",
+                        )
                         custom_text = gr.Textbox(
-                            label="Text to Synthesize",
+                            label="Script",
                             placeholder="Enter text to synthesize...",
                             lines=4,
                             value="Hello everyone! Qwen3-TTS offers expressive and natural sounding speech generation.",
+                            elem_id="custom-text", elem_classes="studio-field",
                         )
-                        with gr.Row():
+                        with gr.Row(elem_classes=["studio-settings", "studio-settings-three"]):
                             custom_speaker = gr.Dropdown(
                                 label="Preset Speaker",
                                 choices=SPEAKERS,
                                 value="Aiden",
+                                min_width=0, elem_classes="studio-field",
                             )
                             custom_language = gr.Dropdown(
                                 label="Language",
                                 choices=LANGUAGES,
                                 value="Auto",
+                                min_width=0, elem_classes="studio-field",
                             )
                             custom_model_size = gr.Dropdown(
                                 label="Model Size",
                                 choices=MODEL_SIZES,
                                 value="1.7B",
+                                min_width=0, elem_classes="studio-field",
                             )
                         custom_instruct = gr.Textbox(
-                            label="Style / Emotion Instruction (Optional)",
+                            label="Style / emotion",
                             placeholder="e.g. Speak excitedly and fast, or whisper gently...",
                             lines=2,
+                            elem_id="custom-instruction", elem_classes="studio-field",
                         )
                         preset_buttons(STYLE_PRESETS, custom_instruct)
                         gr.Markdown(
@@ -737,22 +1041,26 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
                             elem_classes="studio-hint",
                         )
                         custom_btn = gr.Button(
-                            "Synthesize speech", variant="primary", elem_classes="studio-generate",
+                            "Synthesize speech", variant="primary",
+                            elem_id="custom-generate", elem_classes="studio-generate",
                         )
-                    custom_audio, custom_status = output_panel("#047857")
+                    custom_audio, custom_status = output_panel(
+                        "custom", MODE_WAVEFORM_COLORS["Custom Voice"],
+                    )
 
         with gr.Column(elem_id="recent-generations", elem_classes="studio-panel"):
             gr.Markdown(
                 "## Recent Generations\n"
-                "Your session, in sound. Clips from all three modes appear here, newest first. "
-                "Download anything you want to keep before closing or refreshing this page."
+                "Your takes from all three modes, newest first. Download clips to keep them after this session.",
+                elem_classes="studio-section-heading",
             )
 
             @gr.render(inputs=history)
             def render_history(clips: List[GenerationClip]):
                 if not clips:
                     gr.HTML(
-                        '<p class="history-empty">Nothing here yet. Generate your first clip above.</p>'
+                        '<p class="history-empty">Your studio is quiet. Generate a clip to start your collection.</p>',
+                        elem_classes="studio-html",
                     )
                 for clip in clips:
                     mode_class = MODE_CLASSES[clip.mode]
@@ -764,16 +1072,24 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
                             '<div class="history-meta">'
                             f'<span class="mode-badge">{escape(clip.mode)}</span>'
                             f'<time datetime="{escape(clip.timestamp)}">'
-                            f'{escape(timestamp.strftime("%b %d, %Y / %H:%M:%S %Z"))}</time></div>'
+                            f'{escape(timestamp.strftime("%b %d, %Y / %H:%M:%S %Z"))}</time></div>',
+                            elem_classes="studio-html",
                         )
-                        with gr.Row():
+                        with gr.Row(elem_classes="history-playback"):
                             gr.Audio(
                                 value=clip.path,
                                 label=f"{clip.mode} / {timestamp.strftime('%H:%M:%S')}",
-                                interactive=False, format="wav", key=f"audio-{clip.id}",
+                                interactive=False, editable=False, format="wav",
+                                min_width=0, scale=1, buttons=[], elem_classes="studio-player",
+                                waveform_options=gr.WaveformOptions(
+                                    waveform_color="#64748b",
+                                    waveform_progress_color=MODE_WAVEFORM_COLORS[clip.mode],
+                                ),
+                                key=f"audio-{clip.id}",
                             )
                             gr.DownloadButton(
-                                "Download WAV", value=clip.path, min_width=140, scale=0,
+                                "Download WAV", value=clip.path, min_width=0, scale=0,
+                                size="sm", elem_classes="studio-download",
                                 key=f"download-{clip.id}",
                             )
 
@@ -801,11 +1117,15 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
             event = button.click(
                 fn=callback, inputs=inputs, outputs=outputs,
                 concurrency_id="tts-generation", concurrency_limit=1,
+                show_progress_on=outputs[1],
             )
             event.then(
                 hardware_markup, outputs=device_info, queue=False, api_visibility="private",
             )
-        demo.load(hardware_markup, outputs=device_info, queue=False, api_visibility="private")
+        demo.load(
+            hardware_markup, outputs=device_info, queue=False, api_visibility="private",
+            js=TAB_KEYBOARD_JS,
+        )
 
     return demo
 

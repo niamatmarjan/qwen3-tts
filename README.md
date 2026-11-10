@@ -106,7 +106,9 @@ The web interface integrates all three generation workflows from the Hugging Fac
 
 The audio studio follows Gradio's light/dark appearance with translucent panels and
 violet, cyan, and emerald accents for the three modes. It respects reduced-motion,
-reduced-transparency, and increased-contrast preferences.
+reduced-transparency, and increased-contrast preferences. Forms and previews sit
+side by side on desktop and stack on smaller screens. Navigate modes with the
+Left/Right Arrow, Home, and End keys; Tab moves into the active form.
 
 **Recent Generations** keeps clips from all modes below the tabs, with timestamps,
 mode badges, preview players, and **Download WAV** buttons. History belongs to the
@@ -127,7 +129,7 @@ Generate natural voices purely from a descriptive text prompt.
 #### 2. 🧬 Voice Clone (0.6B / 1.7B Base)
 Clone any speaker's voice using a short 3-second reference audio snippet.
 * **Reference Audio:** Upload an audio file (`.wav`, `.mp3`, `.m4a`) or record directly through your browser microphone.
-* **Reference Preview:** Review the waveform, play/seek, and use the audio editor's trim tool before cloning. Duration and sample rate update after edits. Update the transcript to match any trimmed reference.
+* **Reference Preview:** Review the waveform and play/seek before cloning. To trim, select the scissors tool, drag the selection handles, then select **Trim**. Duration and sample rate update after edits. Update the transcript to match any trimmed reference.
 * **Reference Text (Optional):** Providing the transcript of the reference audio achieves higher phonetic fidelity.
 * **Use x-vector only:** Check this box for fast, text-free zero-shot cloning.
 * **Target Text:** The new speech to synthesize in the cloned voice.
@@ -200,6 +202,20 @@ The repository includes comprehensive unit tests verifying audio conversion, num
 source .venv/bin/activate
 pytest -v
 ```
+
+The optional browser suite checks all three modes at mobile, tablet, and desktop
+sizes in both themes, along with preset selection, keyboard navigation, audio
+trimming/playback, WAV downloads, and accessibility. It substitutes test audio for
+model inference, so it does not download weights or measure synthesis quality.
+
+With [agent-browser](https://github.com/vercel-labs/agent-browser) installed:
+
+```bash
+python -m pytest -q tests/test_studio_browser.py
+```
+
+If `agent-browser` is not on `PATH`, set `AGENT_BROWSER_EXECUTABLE` to its absolute
+executable path. Browser tests otherwise skip automatically.
 
 ---
 

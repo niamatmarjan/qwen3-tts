@@ -137,8 +137,36 @@ def test_studio_wiring_and_presets():
     }
     reference = next(
         block for block in demo.blocks.values()
-        if isinstance(block, gr.Audio) and block.label == "Reference Audio (Upload or Record)"
+        if isinstance(block, gr.Audio) and block.elem_id == "clone-reference"
     )
     assert reference.editable
     assert reference.interactive
     assert reference.type == "numpy"
+
+
+def test_presets_size_to_their_labels_instead_of_fixed_widths():
+    demo = app.build_ui()
+    buttons = [
+        block for block in demo.blocks.values()
+        if isinstance(block, gr.Button) and "preset-pill" in (block.elem_classes or [])
+    ]
+    assert len(buttons) == len(app.DESIGN_PRESETS) + len(app.STYLE_PRESETS)
+    assert all(button.scale == 0 and button.min_width == 0 for button in buttons)
+
+
+def test_tabs_have_stable_panel_ids_and_previews_are_read_only():
+    demo = app.build_ui()
+    tabs = [block for block in demo.blocks.values() if isinstance(block, gr.Tab)]
+    assert {tab.elem_id for tab in tabs} == {"voice-design", "voice-clone", "custom-voice"}
+    for mode in ("design", "clone", "custom"):
+        preview = next(
+            block for block in demo.blocks.values() if block.elem_id == f"{mode}-audio"
+        )
+        assert not preview.interactive
+        assert not preview.editable
+        assert preview.min_width == 0
+    workspaces = [
+        block for block in demo.blocks.values()
+        if isinstance(block, gr.Row) and "studio-workspace" in (block.elem_classes or [])
+    ]
+    assert len(workspaces) == 3
