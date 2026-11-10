@@ -104,6 +104,17 @@ python app.py
 
 The web interface integrates all three generation workflows from the Hugging Face Space:
 
+The audio studio follows Gradio's light/dark appearance with translucent panels and
+violet, cyan, and emerald accents for the three modes. It respects reduced-motion,
+reduced-transparency, and increased-contrast preferences.
+
+**Recent Generations** keeps clips from all modes below the tabs, with timestamps,
+mode badges, preview players, and **Download WAV** buttons. History belongs to the
+current browser session, not a permanent library: download clips before refreshing
+or closing the page. Audio is stored in temporary WAV files rather than retained
+as arrays in memory; session-owned files are removed when Gradio expires the session.
+Generation requests across all three modes share a single queue to protect model memory.
+
 #### 1. 🎨 Voice Design (1.7B)
 Generate natural voices purely from a descriptive text prompt.
 * **Input Text:** The words you want spoken.
@@ -111,10 +122,12 @@ Generate natural voices purely from a descriptive text prompt.
   * *Example:* `"A warm, calm male narrator with a deep resonant tone speaking at a measured pace."`
   * *Example:* `"A cheerful, young female voice with an energetic and friendly delivery."`
 * **Language Support:** Auto, Chinese, English, Japanese, Korean, French, German, Spanish, Portuguese, Russian.
+* **Inspiration:** One-click Narrator, Upbeat Podcast Host, Calm Meditation Guide, and News Anchor presets populate the voice description, which remains editable.
 
 #### 2. 🧬 Voice Clone (0.6B / 1.7B Base)
 Clone any speaker's voice using a short 3-second reference audio snippet.
 * **Reference Audio:** Upload an audio file (`.wav`, `.mp3`, `.m4a`) or record directly through your browser microphone.
+* **Reference Preview:** Review the waveform, play/seek, and use the audio editor's trim tool before cloning. Duration and sample rate update after edits. Update the transcript to match any trimmed reference.
 * **Reference Text (Optional):** Providing the transcript of the reference audio achieves higher phonetic fidelity.
 * **Use x-vector only:** Check this box for fast, text-free zero-shot cloning.
 * **Target Text:** The new speech to synthesize in the cloned voice.
@@ -124,6 +137,7 @@ Clone any speaker's voice using a short 3-second reference audio snippet.
 Synthesize speech from 9 studio-quality preset speaker timbres.
 * **Preset Speakers:** `Aiden`, `Dylan`, `Eric`, `Ono_anna`, `Ryan`, `Serena`, `Sohee`, `Uncle_fu`, `Vivian`.
 * **Style Instruction (Optional):** Guide the speaker's mood or prosody (e.g., *"Whisper gently"*, *"Speak excitedly and fast"*).
+* **Style Presets:** Excited, Whisper, Authoritative, and Sad populate the editable instruction. Natural-language style control is supported by the `1.7B` model; `0.6B` may not follow these instructions.
 * **Model Size:** `0.6B` or `1.7B`.
 
 ---
