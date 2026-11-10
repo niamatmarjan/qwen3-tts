@@ -7,8 +7,13 @@ from __future__ import annotations
 
 import gc
 import logging
+import os
+import threading
 from dataclasses import dataclass
 from typing import Optional, Tuple
+
+# Enable MPS fallback to CPU for unsupported PyTorch operations on Apple Silicon
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 import torch
 
@@ -35,7 +40,7 @@ def check_flash_attention_available() -> bool:
     try:
         import flash_attn  # noqa: F401
         return True
-    except ImportError:
+    except Exception:
         return False
 
 
@@ -100,10 +105,22 @@ class ModelManager:
         self._current_key: Optional[str] = None
         self._current_model: Optional[object] = None
         self._config: DeviceConfig = get_optimal_device_config(preferred_device)
+        self._lock = threading.Lock()
 
     @property
     def config(self) -> DeviceConfig:
         return self._config
+
+    def switch_to_cpu(self) -> None:
+        """Switch active configuration to CPU and evict resident GPU/MPS models."""
+        with self._lock:
+            logger.warning("Switching device configuration to CPU.")
+            self._config = DeviceConfig(
+                device="cpu",
+                dtype=torch.float32,
+                attn_implementation="sdpa",
+            )
+            self.evict_current_model()
 
     @staticmethod
     def get_model_id(model_type: str, model_size: str) -> str:
@@ -139,47 +156,53 @@ class ModelManager:
         Retrieve or load the requested model. If a different model is loaded,
         the previous one will be evicted to preserve system memory.
         """
-        model_id = self.get_model_id(model_type, model_size)
+        with self._lock:
+            model_id = self.get_model_id(model_type, model_size)
 
-        if self._current_key == model_id and self._current_model is not None:
-            return self._current_model
+            if self._current_key == model_id and self._current_model is not None:
+                return self._current_model
 
-        # Evict old model
-        self.evict_current_model()
+            # Evict old model
+            self.evict_current_model()
 
-        logger.info("Loading model %s using %s...", model_id, self._config)
+            logger.info("Loading model %s using %s...", model_id, self._config)
 
-        # Import dynamically so device_utils can be tested without downloading models
-        from qwen_tts import Qwen3TTSModel
-        from huggingface_hub import snapshot_download
+            # Check if pre-downloaded local folder exists in workspace
+            local_folder_name = f"Qwen3-TTS-12Hz-{model_size.strip()}-{model_type.strip()}"
+            if os.path.isdir(local_folder_name):
+                local_path = os.path.abspath(local_folder_name)
+                logger.info("Using local model directory: %s", local_path)
+            else:
+                from huggingface_hub import snapshot_download
+                local_path = snapshot_download(model_id)
 
-        local_path = snapshot_download(model_id)
+            from qwen_tts import Qwen3TTSModel
 
-        try:
-            model = Qwen3TTSModel.from_pretrained(
-                local_path,
-                device_map=self._config.device,
-                dtype=self._config.dtype,
-                attn_implementation=self._config.attn_implementation,
-            )
-        except Exception as e:
-            # If MPS fails for any backend reason, fallback to CPU
-            if self._config.device == "mps":
-                logger.warning(
-                    "Failed to load model on MPS (%s). Falling back to CPU.", e
-                )
-                self._config = DeviceConfig(
-                    device="cpu", dtype=torch.float32, attn_implementation="sdpa"
-                )
+            try:
                 model = Qwen3TTSModel.from_pretrained(
                     local_path,
-                    device_map="cpu",
-                    dtype=torch.float32,
-                    attn_implementation="sdpa",
+                    device_map=self._config.device,
+                    dtype=self._config.dtype,
+                    attn_implementation=self._config.attn_implementation,
                 )
-            else:
-                raise
+            except Exception as e:
+                # If MPS fails for any backend reason, fallback to CPU
+                if self._config.device == "mps":
+                    logger.warning(
+                        "Failed to load model on MPS (%s). Falling back to CPU.", e
+                    )
+                    self._config = DeviceConfig(
+                        device="cpu", dtype=torch.float32, attn_implementation="sdpa"
+                    )
+                    model = Qwen3TTSModel.from_pretrained(
+                        local_path,
+                        device_map="cpu",
+                        dtype=torch.float32,
+                        attn_implementation="sdpa",
+                    )
+                else:
+                    raise
 
-        self._current_key = model_id
-        self._current_model = model
-        return model
+            self._current_key = model_id
+            self._current_model = model
+            return model

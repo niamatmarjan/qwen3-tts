@@ -96,10 +96,16 @@ def audio_to_tuple(audio: Any) -> Optional[Tuple[np.ndarray, int]]:
     if audio is None:
         return None
 
-    if isinstance(audio, tuple) and len(audio) == 2 and isinstance(audio[0], int):
-        sr, wav = audio
-        wav = normalize_audio(wav)
-        return wav, int(sr)
+    if isinstance(audio, tuple) and len(audio) == 2:
+        # Support both (sr, wav) and (wav, sr), with int or numpy integer types
+        if isinstance(audio[0], (int, np.integer)):
+            sr = int(audio[0])
+            wav = normalize_audio(audio[1])
+            return wav, sr
+        elif isinstance(audio[1], (int, np.integer)):
+            sr = int(audio[1])
+            wav = normalize_audio(audio[0])
+            return wav, sr
 
     if isinstance(audio, dict) and "sampling_rate" in audio and "data" in audio:
         sr = int(audio["sampling_rate"])
@@ -107,6 +113,30 @@ def audio_to_tuple(audio: Any) -> Optional[Tuple[np.ndarray, int]]:
         return wav, sr
 
     return None
+
+
+def _execute_with_mps_fallback(
+    action_fn: Any,
+    model_type: str,
+    model_size: str,
+    progress: gr.Progress,
+) -> Any:
+    """Execute model action with automatic fallback from MPS to CPU if kernel errors occur."""
+    manager = get_model_manager()
+    try:
+        progress(0.2, desc=f"Loading {model_type} {model_size} model...")
+        model = manager.get_model(model_type, model_size)
+        progress(0.5, desc="Synthesizing speech...")
+        return action_fn(model)
+    except Exception as e:
+        if manager.config.device == "mps":
+            logger.warning("Generation encountered error on MPS (%s). Retrying on CPU...", e)
+            manager.switch_to_cpu()
+            progress(0.3, desc=f"Reloading {model_type} {model_size} on CPU...")
+            model = manager.get_model(model_type, model_size)
+            progress(0.6, desc="Synthesizing speech on CPU...")
+            return action_fn(model)
+        raise
 
 
 def generate_voice_design(
@@ -121,19 +151,17 @@ def generate_voice_design(
     if not voice_description or not voice_description.strip():
         return None, "Error: Voice description is required."
 
-    manager = get_model_manager()
-    try:
-        progress(0.2, desc="Loading VoiceDesign 1.7B model...")
-        model = manager.get_model("VoiceDesign", "1.7B")
-
-        progress(0.5, desc="Generating speech...")
-        wavs, sr = model.generate_voice_design(
+    def _run(model):
+        return model.generate_voice_design(
             text=text.strip(),
             language=language,
             instruct=voice_description.strip(),
             non_streaming_mode=True,
             max_new_tokens=2048,
         )
+
+    try:
+        wavs, sr = _execute_with_mps_fallback(_run, "VoiceDesign", "1.7B", progress)
         progress(1.0, desc="Done!")
         return (sr, wavs[0]), "Voice design generation completed successfully!"
     except Exception as e:
@@ -161,13 +189,8 @@ def generate_voice_clone(
     if not use_xvector_only and (not ref_text or not ref_text.strip()):
         return None, "Error: Reference text is required when 'Use x-vector only' is disabled."
 
-    manager = get_model_manager()
-    try:
-        progress(0.2, desc=f"Loading Base {model_size} model...")
-        model = manager.get_model("Base", model_size)
-
-        progress(0.5, desc="Cloning voice and generating speech...")
-        wavs, sr = model.generate_voice_clone(
+    def _run(model):
+        return model.generate_voice_clone(
             text=target_text.strip(),
             language=language,
             ref_audio=audio_tuple,
@@ -175,6 +198,9 @@ def generate_voice_clone(
             x_vector_only_mode=use_xvector_only,
             max_new_tokens=2048,
         )
+
+    try:
+        wavs, sr = _execute_with_mps_fallback(_run, "Base", model_size, progress)
         progress(1.0, desc="Done!")
         return (sr, wavs[0]), "Voice clone generation completed successfully!"
     except Exception as e:
@@ -196,14 +222,10 @@ def generate_custom_voice(
     if not speaker:
         return None, "Error: Speaker is required."
 
-    manager = get_model_manager()
-    try:
-        progress(0.2, desc=f"Loading CustomVoice {model_size} model...")
-        model = manager.get_model("CustomVoice", model_size)
+    speaker_id = speaker.lower().replace(" ", "_")
 
-        progress(0.5, desc="Synthesizing speech...")
-        speaker_id = speaker.lower().replace(" ", "_")
-        wavs, sr = model.generate_custom_voice(
+    def _run(model):
+        return model.generate_custom_voice(
             text=text.strip(),
             language=language,
             speaker=speaker_id,
@@ -211,6 +233,9 @@ def generate_custom_voice(
             non_streaming_mode=True,
             max_new_tokens=2048,
         )
+
+    try:
+        wavs, sr = _execute_with_mps_fallback(_run, "CustomVoice", model_size, progress)
         progress(1.0, desc="Done!")
         return (sr, wavs[0]), "Speech generation completed successfully!"
     except Exception as e:

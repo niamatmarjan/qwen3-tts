@@ -8,6 +8,9 @@ echo "========================================================"
 echo " Starting Qwen3-TTS for macOS (Apple Silicon / CPU)"
 echo "========================================================"
 
+# Enable MPS kernel fallback to CPU for unsupported Metal operations
+export PYTORCH_ENABLE_MPS_FALLBACK=1
+
 # Prefer uv if available, fallback to python3 venv
 if command -v uv >/dev/null 2>&1; then
     echo "[+] uv detected."

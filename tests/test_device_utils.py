@@ -3,6 +3,11 @@ import torch
 from device_utils import get_optimal_device_config, ModelManager, DeviceConfig
 
 
+def test_mps_fallback_environment_variable():
+    import os
+    assert os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK") == "1"
+
+
 def test_device_config_auto():
     config = get_optimal_device_config()
     assert isinstance(config, DeviceConfig)

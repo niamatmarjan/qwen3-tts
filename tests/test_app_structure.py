@@ -17,6 +17,23 @@ def test_normalize_audio_float():
     assert np.allclose(norm, float_audio)
 
 
+def test_audio_to_tuple_numpy_integer_sample_rate():
+    wav = np.zeros(16000, dtype=np.int16)
+    sr_int64 = np.int64(16000)
+    res = audio_to_tuple((sr_int64, wav))
+    assert res is not None
+    audio_data, sample_rate = res
+    assert sample_rate == 16000
+    assert audio_data.dtype == np.float32
+
+    # Also test np.int32
+    sr_int32 = np.int32(24000)
+    res32 = audio_to_tuple((sr_int32, wav))
+    assert res32 is not None
+    _, sample_rate32 = res32
+    assert sample_rate32 == 24000
+
+
 def test_audio_to_tuple_tuple_format():
     wav = np.zeros(16000, dtype=np.int16)
     sr = 16000
