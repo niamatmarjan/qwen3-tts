@@ -28,6 +28,10 @@ if %ERRORLEVEL% equ 0 (
     pip install -e .
 )
 
+REM Tip for Windows NVIDIA GPU users:
+REM If torch installs CPU-only by default in your environment, run:
+REM pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
 echo.
 echo [+] Launching Unified Web UI...
 python app.py %*

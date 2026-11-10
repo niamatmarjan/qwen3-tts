@@ -19,61 +19,185 @@ We release **Qwen3-TTS**, a series of powerful speech generation capabilities de
 
 ## 🚀 Quickstart: Unified Web UI (macOS & Windows)
 
-This repository includes a turnkey, cross-platform **Unified Web UI (`app.py`)** replicating the official [Hugging Face Space](https://huggingface.co/spaces/Qwen/Qwen3-TTS). It automatically detects your hardware (NVIDIA CUDA, Apple Silicon MPS, or CPU) and manages model memory on demand.
+This repository provides a turnkey, cross-platform **Unified Web UI (`app.py`)** replicating the official [Hugging Face Space](https://huggingface.co/spaces/Qwen/Qwen3-TTS). It automatically detects your hardware (NVIDIA CUDA, Apple Silicon MPS, or CPU) and manages model memory on demand to prevent system Out-Of-Memory (OOM) crashes.
 
-### 🍎 On macOS (Apple Silicon M-Series / CPU)
+---
 
-Make sure you have [`uv`](https://github.com/astral-sh/uv) or standard Python 3.10-3.12 installed:
+### 📋 Prerequisites
 
+| Platform | Recommended Specs | Python Version | Package Manager |
+|---|---|---|---|
+| **macOS** | Apple Silicon (M1/M2/M3/M4), 16 GB+ RAM | Python 3.10 – 3.12 | [`uv`](https://github.com/astral-sh/uv) (recommended) or `pip` |
+| **Windows** | NVIDIA GPU (RTX 3060+ with 8 GB+ VRAM) or CPU | Python 3.10 – 3.12 | `uv` or `pip` (CUDA 12.1 / 12.4) |
+| **Linux** | NVIDIA GPU (CUDA 12+) or CPU | Python 3.10 – 3.12 | `uv` or `pip` |
+
+---
+
+### 🍎 Setup on macOS (Apple Silicon M-Series / CPU)
+
+#### Option A: One-Click Launch (Recommended)
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/niamatmarjan/qwen3-tts.git
+   cd qwen3-tts
+   ```
+2. Run the startup script:
+   ```bash
+   ./run_mac.sh
+   ```
+   * The script automatically detects `uv` (or falls back to `python3 -m venv`), installs required dependencies in `.venv`, enables Apple Silicon MPS fallback (`PYTORCH_ENABLE_MPS_FALLBACK=1`), and starts the Web UI.
+3. Open your browser to **`http://localhost:8000`**.
+
+#### Option B: Manual Setup with `uv` or `pip`
 ```bash
-# Clone and enter the repository
-git clone https://github.com/niamatmarjan/qwen3-tts.git
-cd qwen3-tts
-
-# Run the turnkey launch script
-./run_mac.sh
-```
-
-Or run manually with `uv`:
-```bash
+# Create virtual environment with Python 3.12
 uv venv .venv --python 3.12
 source .venv/bin/activate
+
+# Install editable package dependencies
 uv pip install -e .
+
+# Launch the unified UI
 python app.py
 ```
 
-Open `http://localhost:8000` in your web browser.
+---
 
-### 🪟 On Windows (NVIDIA GPU / CUDA / CPU)
+### 🪟 Setup on Windows (NVIDIA GPU / CUDA / CPU)
 
-Double click `run_win.bat` or run in Command Prompt / PowerShell:
+#### Option A: One-Click Launch (Recommended)
+1. Clone the repository in Command Prompt or PowerShell:
+   ```cmd
+   git clone https://github.com/niamatmarjan/qwen3-tts.git
+   cd qwen3-tts
+   ```
+2. Double-click `run_win.bat` or run:
+   ```cmd
+   run_win.bat
+   ```
+3. Open your browser to **`http://localhost:8000`**.
 
+#### Option B: Manual Setup with PyTorch CUDA Support
 ```cmd
-git clone https://github.com/niamatmarjan/qwen3-tts.git
-cd qwen3-tts
-run_win.bat
-```
-
-Or run manually:
-```cmd
+# Create virtual environment
 python -m venv .venv
 call .venv\Scripts\activate.bat
+
+# Install PyTorch with CUDA 12.4 (if you have an NVIDIA GPU)
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Install repository package
 pip install -e .
+
+# Launch UI
 python app.py
 ```
 
-### 🎛️ Features of the Unified Web UI
+---
 
-| Mode | Model | Description |
+### 🎛️ Unified Web UI Features & Modes
+
+The web interface integrates all three generation workflows from the Hugging Face Space:
+
+#### 1. 🎨 Voice Design (1.7B)
+Generate natural voices purely from a descriptive text prompt.
+* **Input Text:** The words you want spoken.
+* **Voice Description:** Describe the desired timbre, pitch, tempo, and personality in natural language.
+  * *Example:* `"A warm, calm male narrator with a deep resonant tone speaking at a measured pace."`
+  * *Example:* `"A cheerful, young female voice with an energetic and friendly delivery."`
+* **Language Support:** Auto, Chinese, English, Japanese, Korean, French, German, Spanish, Portuguese, Russian.
+
+#### 2. 🧬 Voice Clone (0.6B / 1.7B Base)
+Clone any speaker's voice using a short 3-second reference audio snippet.
+* **Reference Audio:** Upload an audio file (`.wav`, `.mp3`, `.m4a`) or record directly through your browser microphone.
+* **Reference Text (Optional):** Providing the transcript of the reference audio achieves higher phonetic fidelity.
+* **Use x-vector only:** Check this box for fast, text-free zero-shot cloning.
+* **Target Text:** The new speech to synthesize in the cloned voice.
+* **Model Size:** Choose between fast `0.6B` or high-fidelity `1.7B`.
+
+#### 3. 🗣️ Custom Voice (0.6B / 1.7B CustomVoice)
+Synthesize speech from 9 studio-quality preset speaker timbres.
+* **Preset Speakers:** `Aiden`, `Dylan`, `Eric`, `Ono_anna`, `Ryan`, `Serena`, `Sohee`, `Uncle_fu`, `Vivian`.
+* **Style Instruction (Optional):** Guide the speaker's mood or prosody (e.g., *"Whisper gently"*, *"Speak excitedly and fast"*).
+* **Model Size:** `0.6B` or `1.7B`.
+
+---
+
+### ⚙️ Command-Line Arguments (`app.py`)
+
+You can customize the Web UI launch parameters:
+
+```bash
+python app.py --host 0.0.0.0 --port 8000 --device mps
+```
+
+| Flag | Default | Description |
 |---|---|---|
-| **🎨 Voice Design** | `1.7B-VoiceDesign` | Describe any voice timbre in natural language (e.g. *"warm friendly radio host"*) to synthesize speech. |
-| **🧬 Voice Clone** | `0.6B / 1.7B Base` | Provide a 3-second audio sample (upload or microphone) to rapidly clone the voice. |
-| **🗣️ Custom Voice** | `0.6B / 1.7B CustomVoice` | Select from 9 preset speakers (*Aiden, Dylan, Eric, Ono_anna, Ryan, Serena, Sohee, Uncle_fu, Vivian*) with custom emotion/style instructions. |
+| `--host` | `0.0.0.0` | Network interface to bind (use `127.0.0.1` for local only). |
+| `--port` | `8000` | Port number for the web server. |
+| `--device` | `None` (auto) | Explicit hardware override: `cuda`, `cuda:0`, `mps`, or `cpu`. |
+| `--share` | `False` | Generates a temporary public Gradio shareable link. |
+| `--ssl-certfile` | `None` | Path to SSL certificate (recommended for remote microphone access). |
+| `--ssl-keyfile` | `None` | Path to SSL private key. |
 
-### ⚡ Memory & Device Optimization
-- **Apple Silicon (M1/M2/M3/M4):** Configured for PyTorch Metal (`mps`) with SDPA attention.
-- **NVIDIA GPU (Windows/Linux):** Configured for CUDA, `bfloat16`/`float16`, and FlashAttention 2 if installed.
-- **On-Demand Memory Management:** The server loads only the currently active model and evicts previous weights when switching tabs or model sizes, preventing Out-Of-Memory (OOM) errors on 16 GB machines.
+---
+
+### ⚡ Hardware Detection & Memory Management
+
+* **Apple Silicon (M1/M2/M3/M4):**
+  * Auto-selects `mps` (Metal Performance Shaders) with `float32` precision and SDPA attention.
+  * Auto-sets `PYTORCH_ENABLE_MPS_FALLBACK=1` for seamless execution of any unmapped audio ops.
+  * Includes automatic fallback to CPU if an MPS kernel raises a runtime error.
+* **NVIDIA GPUs (Windows/Linux):**
+  * Auto-selects `cuda` with `bfloat16` (or `float16`) and activates FlashAttention 2 if installed.
+* **On-Demand Model Eviction:**
+  * Rather than holding 15+ GB of model weights in memory simultaneously, `device_utils.ModelManager` lazily loads the selected model and cleans up the previous model (`gc.collect()`, `empty_cache()`) when switching modes. This allows the application to run comfortably on standard 16 GB unified RAM Macs.
+
+---
+
+### 📦 Offline Model Downloads (Optional)
+
+Model weights download automatically from Hugging Face Hub upon first use and are cached locally. If your machine is in an offline or firewalled environment, you can pre-download weights:
+
+```bash
+# Download via Hugging Face Hub CLI
+pip install -U "huggingface_hub[cli]"
+huggingface-cli download Qwen/Qwen3-TTS-Tokenizer-12Hz --local-dir ./Qwen3-TTS-Tokenizer-12Hz
+huggingface-cli download Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice --local-dir ./Qwen3-TTS-12Hz-1.7B-CustomVoice
+huggingface-cli download Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign --local-dir ./Qwen3-TTS-12Hz-1.7B-VoiceDesign
+huggingface-cli download Qwen/Qwen3-TTS-12Hz-1.7B-Base --local-dir ./Qwen3-TTS-12Hz-1.7B-Base
+huggingface-cli download Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice --local-dir ./Qwen3-TTS-12Hz-0.6B-CustomVoice
+huggingface-cli download Qwen/Qwen3-TTS-12Hz-0.6B-Base --local-dir ./Qwen3-TTS-12Hz-0.6B-Base
+```
+`ModelManager` automatically detects local folders matching these names before attempting remote network downloads.
+
+---
+
+### 🧪 Running Developer Tests
+
+The repository includes comprehensive unit tests verifying audio conversion, numpy format compatibility, hardware detection, and memory eviction:
+
+```bash
+source .venv/bin/activate
+pytest -v
+```
+
+---
+
+### ❓ Troubleshooting
+
+* **Microphone Permissions in Browser:**
+  Modern browsers require `localhost` or `HTTPS` to grant microphone recording permissions. If accessing the web UI remotely, pass `--ssl-certfile` and `--ssl-keyfile` to `app.py`.
+* **Port Already in Use:**
+  If port 8000 is occupied, specify another port:
+  ```bash
+  python app.py --port 8080
+  ```
+* **Windows PyTorch CPU vs CUDA:**
+  If PyTorch runs on CPU on a machine with an NVIDIA GPU, reinstall torch with CUDA support:
+  ```cmd
+  pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+  ```
 
 ---
 
