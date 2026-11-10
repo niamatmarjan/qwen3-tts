@@ -15,6 +15,68 @@
 
 We release **Qwen3-TTS**, a series of powerful speech generation capabilities developed by Qwen, offering comprehensive support for voice clone, voice design, ultra-high-quality human-like speech generation, and natural language-based voice control. It provides developers and users with the most extensive set of speech generation features available.
 
+---
+
+## 🚀 Quickstart: Unified Web UI (macOS & Windows)
+
+This repository includes a turnkey, cross-platform **Unified Web UI (`app.py`)** replicating the official [Hugging Face Space](https://huggingface.co/spaces/Qwen/Qwen3-TTS). It automatically detects your hardware (NVIDIA CUDA, Apple Silicon MPS, or CPU) and manages model memory on demand.
+
+### 🍎 On macOS (Apple Silicon M-Series / CPU)
+
+Make sure you have [`uv`](https://github.com/astral-sh/uv) or standard Python 3.10-3.12 installed:
+
+```bash
+# Clone and enter the repository
+git clone https://github.com/niamatmarjan/qwen3-tts.git
+cd qwen3-tts
+
+# Run the turnkey launch script
+./run_mac.sh
+```
+
+Or run manually with `uv`:
+```bash
+uv venv .venv --python 3.12
+source .venv/bin/activate
+uv pip install -e .
+python app.py
+```
+
+Open `http://localhost:8000` in your web browser.
+
+### 🪟 On Windows (NVIDIA GPU / CUDA / CPU)
+
+Double click `run_win.bat` or run in Command Prompt / PowerShell:
+
+```cmd
+git clone https://github.com/niamatmarjan/qwen3-tts.git
+cd qwen3-tts
+run_win.bat
+```
+
+Or run manually:
+```cmd
+python -m venv .venv
+call .venv\Scripts\activate.bat
+pip install -e .
+python app.py
+```
+
+### 🎛️ Features of the Unified Web UI
+
+| Mode | Model | Description |
+|---|---|---|
+| **🎨 Voice Design** | `1.7B-VoiceDesign` | Describe any voice timbre in natural language (e.g. *"warm friendly radio host"*) to synthesize speech. |
+| **🧬 Voice Clone** | `0.6B / 1.7B Base` | Provide a 3-second audio sample (upload or microphone) to rapidly clone the voice. |
+| **🗣️ Custom Voice** | `0.6B / 1.7B CustomVoice` | Select from 9 preset speakers (*Aiden, Dylan, Eric, Ono_anna, Ryan, Serena, Sohee, Uncle_fu, Vivian*) with custom emotion/style instructions. |
+
+### ⚡ Memory & Device Optimization
+- **Apple Silicon (M1/M2/M3/M4):** Configured for PyTorch Metal (`mps`) with SDPA attention.
+- **NVIDIA GPU (Windows/Linux):** Configured for CUDA, `bfloat16`/`float16`, and FlashAttention 2 if installed.
+- **On-Demand Memory Management:** The server loads only the currently active model and evicts previous weights when switching tabs or model sizes, preventing Out-Of-Memory (OOM) errors on 16 GB machines.
+
+---
+
 
 ## News
 * 2026.1.22: 🎉🎉🎉 We have released [Qwen3-TTS](https://huggingface.co/collections/Qwen/qwen3-tts) series (0.6B/1.7B) based on Qwen3-TTS-Tokenizer-12Hz. Please check our [blog](https://qwen.ai/blog?id=qwen3tts-0115)!
