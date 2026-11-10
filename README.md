@@ -21,6 +21,11 @@ We release **Qwen3-TTS**, a series of powerful speech generation capabilities de
 
 This repository provides a turnkey, cross-platform **Unified Web UI (`app.py`)** replicating the official [Hugging Face Space](https://huggingface.co/spaces/Qwen/Qwen3-TTS). It automatically detects your hardware (NVIDIA CUDA, Apple Silicon MPS, or CPU) and manages model memory on demand to prevent system Out-Of-Memory (OOM) crashes.
 
+> 💡 **Important: First-Time Model Downloads**  
+> When you first click **Generate** on any mode (Voice Design, Voice Clone, or Custom Voice), that model variant's weights (~1.5 GB to 3.5 GB) will be downloaded from Hugging Face Hub.  
+> **This download happens ONLY ONCE per model.**  
+> All weights are saved permanently to your local disk (`~/.cache/huggingface/hub/`). Subsequent generations load directly from disk in seconds without re-downloading!
+
 ---
 
 ### 📋 Prerequisites

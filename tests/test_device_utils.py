@@ -8,6 +8,15 @@ def test_mps_fallback_environment_variable():
     assert os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK") == "1"
 
 
+def test_is_model_fully_cached():
+    from device_utils import is_model_fully_cached
+
+    # VoiceDesign 1.7B is now cached on this machine
+    assert is_model_fully_cached("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign") is True
+    # Non-existent model should return False
+    assert is_model_fully_cached("Qwen/NonExistentModel-123456") is False
+
+
 def test_device_config_auto():
     config = get_optimal_device_config()
     assert isinstance(config, DeviceConfig)

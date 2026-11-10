@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import gradio as gr
 import numpy as np
 
-from device_utils import ModelManager, get_optimal_device_config
+from device_utils import ModelManager, get_optimal_device_config, is_model_fully_cached
 
 logging.basicConfig(
     level=logging.INFO,
@@ -123,8 +123,19 @@ def _execute_with_mps_fallback(
 ) -> Any:
     """Execute model action with automatic fallback from MPS to CPU if kernel errors occur."""
     manager = get_model_manager()
+    model_id = manager.get_model_id(model_type, model_size)
+    cached = is_model_fully_cached(model_id)
+
+    if not cached:
+        gr.Info(
+            f"⏳ First-time setup: Downloading {model_type} {model_size} weights (~1.5–3.5 GB). "
+            "This happens ONLY ONCE! Check terminal for live progress."
+        )
+        progress(0.05, desc=f"⏳ Downloading {model_id} (~1.5–3.5 GB, first time only)...")
+    else:
+        progress(0.15, desc=f"🚀 Loading {model_type} {model_size} from local disk cache...")
+
     try:
-        progress(0.2, desc=f"Loading {model_type} {model_size} model...")
         model = manager.get_model(model_type, model_size)
         progress(0.5, desc="Synthesizing speech...")
         return action_fn(model)
@@ -266,6 +277,10 @@ def build_ui(preferred_device: Optional[str] = None) -> gr.Blocks:
 **Cross-Platform Speech Generation (Apple Silicon & NVIDIA CUDA)**
 
 Active Device Configuration: `{config.device}` | Precision: `{config.dtype}` | Attention: `{config.attn_implementation}`
+
+> ℹ️ **First-Time Generation Notice:**  
+> When you click **Generate** for a model variant the first time, its weights (~1.5 GB to 3.5 GB) will be downloaded from Hugging Face.  
+> **This download happens ONLY ONCE per model.** Once cached on your disk, subsequent generations load instantly in seconds.
 
 Three generation modes:
 - **Voice Design**: Create custom voice timbres using natural language descriptions.

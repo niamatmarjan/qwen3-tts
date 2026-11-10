@@ -44,6 +44,29 @@ def check_flash_attention_available() -> bool:
         return False
 
 
+def is_model_fully_cached(model_id: str) -> bool:
+    """Check if model weights are already downloaded in the HF cache or local folder."""
+    clean_id = model_id.strip()
+    folder_name = clean_id.split("/")[-1]
+    if os.path.isdir(folder_name):
+        return True
+
+    try:
+        from huggingface_hub import try_to_load_from_cache
+
+        for candidate in (
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "pytorch_model.bin",
+        ):
+            cached = try_to_load_from_cache(clean_id, candidate)
+            if isinstance(cached, str):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def get_optimal_device_config(preferred_device: Optional[str] = None) -> DeviceConfig:
     """
     Determine the optimal device, dtype, and attention implementation.
@@ -173,6 +196,16 @@ class ModelManager:
                 local_path = os.path.abspath(local_folder_name)
                 logger.info("Using local model directory: %s", local_path)
             else:
+                is_cached = is_model_fully_cached(model_id)
+                if not is_cached:
+                    logger.info("=" * 70)
+                    logger.info("[!] First-time setup: Downloading weights for %s", model_id)
+                    logger.info("[!] Size: ~1.5 - 3.5 GB. This download happens ONLY ONCE.")
+                    logger.info("[!] Subsequent runs will load instantly from disk.")
+                    logger.info("=" * 70)
+                else:
+                    logger.info("[+] Model %s is cached. Loading weights from local disk...", model_id)
+
                 from huggingface_hub import snapshot_download
                 local_path = snapshot_download(model_id)
 
